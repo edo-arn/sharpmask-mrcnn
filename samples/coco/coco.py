@@ -61,7 +61,7 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
-DEFAULT_DATASET_YEAR = "2014"
+DEFAULT_DATASET_YEAR = "2017"
 
 ############################################################
 #  Configurations
@@ -496,30 +496,30 @@ if __name__ == '__main__':
         # *** This training schedule is an example. Update to your needs ***
 
         # Training - Stage 1
-        print("Training network heads")
+        print("Training mask layers only")
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=40,
-                    layers='heads',
+                    epochs=20,
+                    layers='mask',
                     augmentation=augmentation)
 
         # Training - Stage 2
         # Finetune layers from ResNet stage 4 and up
-        print("Fine tune Resnet stage 4 and up")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE,
-                    epochs=120,
-                    layers='4+',
-                    augmentation=augmentation)
+        #print("Fine tune Resnet stage 4 and up")
+        #model.train(dataset_train, dataset_val,
+                    #learning_rate=config.LEARNING_RATE,
+                    #epochs=120,
+                    #layers='4+',
+                    #augmentation=augmentation)
 
         # Training - Stage 3
         # Fine tune all layers
-        print("Fine tune all layers")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE / 10,
-                    epochs=160,
-                    layers='all',
-                    augmentation=augmentation)
+        #print("Fine tune all layers")
+        #model.train(dataset_train, dataset_val,
+                    #learning_rate=config.LEARNING_RATE / 10,
+                    #epochs=160,
+                    #layers='all',
+                    #augmentation=augmentation)
 
     elif args.command == "evaluate":
         # Validation dataset
