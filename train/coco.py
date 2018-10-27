@@ -468,7 +468,7 @@ if __name__ == '__main__':
         model_path = args.model
 
     # Load weights
-    if not os.path.exists(model_path) && model_path == COCO_MODEL_PATH:
+    if not os.path.exists(model_path) and model_path == COCO_MODEL_PATH:
         utils.download_trained_weights(model_path)
     print("Loading weights ", model_path)
     model.load_weights(model_path, by_name=True)
