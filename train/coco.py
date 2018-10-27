@@ -451,11 +451,9 @@ if __name__ == '__main__':
 
     # Create model
     if args.command == "train":
-        model = modellib.MaskRCNN(mode="training", config=config,
-                                  model_dir=args.logs)
+        model = modellib.MaskRCNN(mode="training", config=config, model_dir=args.logs)
     else:
-        model = modellib.MaskRCNN(mode="inference", config=config,
-                                  model_dir=args.logs)
+        model = modellib.MaskRCNN(mode="inference", config=config, model_dir=args.logs)
 
     # Select weights file to load
     if args.model.lower() == "coco":
@@ -470,6 +468,8 @@ if __name__ == '__main__':
         model_path = args.model
 
     # Load weights
+    if not os.path.exists(model_path) && model_path == COCO_MODEL_PATH:
+        utils.download_trained_weights(model_path)
     print("Loading weights ", model_path)
     model.load_weights(model_path, by_name=True)
 

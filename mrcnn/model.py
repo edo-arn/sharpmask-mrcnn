@@ -1060,7 +1060,7 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.Activation('relu', name="mrcnn_mask_relu4")(x)
 
     x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"),
-                           name="mrcnn_mask")(x)
+                           name="mrcnn_mask_out")(x)
     return x
 
 
