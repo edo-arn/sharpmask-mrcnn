@@ -1011,10 +1011,10 @@ def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_roi_align{}".format(stage))([rois, fpn_map])
     f = KL.TimeDistributed(
         KL.Conv2D(channels, (1, 1), strides=1, activation="relu", name="sharp_mask_crunch{}".format(stage)),
-        name="sharp_mask_td_ref{}".format(stage))(f)
+        name="sharp_mask_td_ref{}a".format(stage))(f)
     m = KL.TimeDistributed(
         KL.Conv2DTranspose(channels, (2, 2), strides=2, activation="relu", name="sharp_mask_deconv{}".format(stage)),
-        name="sharp_mask_td_ref{}".format(stage))(x)
+        name="sharp_mask_td_ref{}b".format(stage))(x)
     out = KL.Add(name="sharp_mask_add{}".format(stage))([m, f])
     return out
 
