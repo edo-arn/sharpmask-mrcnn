@@ -1007,11 +1007,11 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
 
-def refinement_module(x, rois, fpn_map, pool_size, stage):
+def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_roi_align{}".format(stage))([rois, fpn_map])
-    f = KL.Activation("relu", name="sharp_mask_relu{}a".format(stage))(f)
+    f = KL.Conv2D(channels, (1, 1), strides=1, padding="valid", activation="relu", name="sharp_mask_crunch{}".format(stage))
     m = KL.TimeDistributed(
-        KL.Conv2DTranspose(256, (2, 2), strides=2, activation="relu", name="sharp_mask_deconv{}".format(stage)),
+        KL.Conv2DTranspose(channels, (2, 2), strides=2, activation="relu", name="sharp_mask_deconv{}".format(stage)),
         name="sharp_mask_td{}".format(stage))(x)
     out = KL.Add(name="sharp_mask_add{}".format(stage))([m, f])
     return out
@@ -1045,19 +1045,19 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.Activation('relu', name="sharp_mask_relu1")(x)
 
     #32 x 32 x 256
-    x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 2)
+    x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 256, 2)
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv2"), name="sharp_mask_td2a")(x)
     x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn2"), name='sharp_mask_td2b')(x, training=train_bn)
     x = KL.Activation('relu', name="sharp_mask_relu2")(x)
 
     # 64 x 64 x 128
-    x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 3)
+    x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 192, 3)
     x = KL.TimeDistributed(KL.Conv2D(192, (3, 3), padding="same", name="sharp_mask_conv3"), name="sharp_mask_td3a")(x)
     x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn3"), name='sharp_mask_td3b')(x, training=train_bn)
     x = KL.Activation('relu', name="sharp_mask_relu3")(x)
 
-    #
-    x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 4)
+    # 128 x 128 x 128
+    x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 128, 4)
     x = KL.TimeDistributed(KL.Conv2D(128, (3, 3), padding="same", name="sharp_mask_conv4"), name="sharp_mask_td4a")(x)
     x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn4"), name='sharp_mask_td4b')(x, training=train_bn)
     x = KL.Activation('relu', name="sharp_mask_relu4")(x)
