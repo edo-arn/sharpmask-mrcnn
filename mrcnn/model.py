@@ -1009,7 +1009,7 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
 
 def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_roi_align{}".format(stage))([rois, fpn_map])
-    f = KL.Conv2D(channels, (1, 1), strides=1, padding="valid", activation="relu", name="sharp_mask_crunch{}".format(stage))
+    f = KL.Conv2D(channels, (1, 1), strides=1, padding="valid", activation="relu", name="sharp_mask_crunch{}".format(stage))(f)
     m = KL.TimeDistributed(
         KL.Conv2DTranspose(channels, (2, 2), strides=2, activation="relu", name="sharp_mask_deconv{}".format(stage)),
         name="sharp_mask_td{}".format(stage))(x)
