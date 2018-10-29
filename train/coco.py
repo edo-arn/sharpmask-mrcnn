@@ -85,6 +85,8 @@ class CocoConfig(Config):
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
+    MASK_SHAPE = [28, 28]
+    MINI_MASK_SHAPE = (56, 56)
 
 
 ############################################################
