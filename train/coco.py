@@ -85,8 +85,8 @@ class CocoConfig(Config):
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
-    MASK_SHAPE = [28, 28]
-    MINI_MASK_SHAPE = (56, 56)
+    MASK_SHAPE = [64, 64]
+    MINI_MASK_SHAPE = (64, 64)
 
 
 ############################################################
@@ -341,7 +341,7 @@ def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
     return results
 
 
-def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=None):
+def evaluate_coco(model, dataset, coco, eval_type="segm", limit=0, image_ids=None):
     """Runs official COCO evaluation.
     dataset: A Dataset object with valiadtion data
     eval_type: "bbox" or "segm" for bounding box or segmentation evaluation
