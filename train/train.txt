@@ -1,0 +1,1 @@
+nohup python coco.py train --dataset=$HOME/data/coco/ --model=coco --year=2017 &
