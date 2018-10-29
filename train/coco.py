@@ -499,7 +499,7 @@ if __name__ == '__main__':
         print("Training mask layers only")
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=20,
+                    epochs=40,
                     layers='mask',
                     augmentation=augmentation)
 
