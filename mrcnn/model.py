@@ -22,6 +22,8 @@ import keras.backend as K
 import keras.layers as KL
 import keras.engine as KE
 import keras.models as KM
+import keras.backend as KB
+from keras.utils import conv_utils
 
 from mrcnn import utils
 
@@ -877,6 +879,23 @@ class DetectionLayer(KE.Layer):
         return (None, self.config.DETECTION_MAX_INSTANCES, 6)
 
 
+class UpsamplingLayer(KE.Layer):
+    """Takes a 4D tensor [batch, height, width, channels] and resizes it applying bilinear interpolation.
+
+    :returns [batch, h * h_factor, w * w_factor, channels] interpolated
+    """
+    def __init__(self, size=(2,2), **kwargs):
+        super(UpsamplingLayer, self).__init__(**kwargs)
+        self.size = [x for x in size]
+
+    def call(self, inputs):
+        return tf.image.resize_bilinear(inputs, self.size)
+
+    def compute_output_shape(self, input_shape):
+        b, h, w, ch = input_shape
+        return (b, h*self.size[0], w*self.size[1], ch)
+
+
 ############################################################
 #  Region Proposal Network (RPN)
 ############################################################
@@ -1019,46 +1038,6 @@ def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
     return out
 
-
-def bilinear_kernel(h,w,channels, use_bias = True, dtype = "float32"):
-    """
-    credits: https://github.com/pgrenholm/upsampling/blob/master/bilinearKernel.py
-    Returns uniform layer weights for a Conv2D or ConvTranspose2D layer in Keras 2.0, tensorflow channel ordering.
-    If the input image has size (in_height, in_width), the output image after scaling will have size
-    (h*(in_height-1) + 1,  w*(in_width-1) + 1)
-    Arguments:
-    (h,w) : the magnification factors for height and weight. These must be positive integers.
-    channels : the number of channels/filters, this must be the same in input and output image. Positive integer
-    use_bias : must have the same value as 'use_bias' in the layer initialization. Default is True,
-              which means that the layer has a bias which is set to 0.0. Boolean
-    dtype : the datatype of the returned weights
-    """
-    y = np.zeros((h,w,channels,channels), dtype = dtype)
-    for i in range(0,h) :
-        for j in range(0,w) :
-            y[i,j,:,:] = np.identity(channels) / float(h*w*1)
-    if use_bias : return [y,np.array([0.], dtype = dtype)]
-    else : return [y]
-
-
-def bilinear_upsampling2D(x, channels, stage, size=(2,2)):
-    """
-    Keras does not have an Upsampling layer with interpolation (until the most recent versions).
-    Use a combination of upsampling and conv2Dtranspose to achieve it.
-    :param x:   input tensor [batch, rois, h, w, channels]
-    :param size:tuple for the upsampling, e.g. (2,2)
-    :return: tensor of size [batch, rois, h x size[0], w x size[1], channels], linearly interpolated
-    """
-    h, w = size
-    w = bilinear_kernel(h, w, channels, use_bias=False)
-    ups = KL.TimeDistributed(KL.UpSampling2D(size), name="sharp_mask_ups{}".format(stage))(x)
-    cvt = KL.TimeDistributed(
-        KL.Conv2D(channels, size, activation="linear", padding="same", use_bias=False, weights=w, trainable=False),
-        name="sharp_deconv{}".format(stage))(ups)
-    return cvt
-
-
-
 def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=True):
     """Builds the computation graph of the mask head of Feature Pyramid Network.
 
@@ -1093,10 +1072,10 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4')(x, training=train_bn)
     x = KL.Activation('relu')(x)
 
-    x = bilinear_upsampling2D(x, 256, 1)
+    x = KL.TimeDistributed(UpsamplingLayer(), name="sharp_mask_up1")(x)
     x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 256, 1)
 
-    x = bilinear_upsampling2D(x, 256, 2)
+    x = KL.TimeDistributed(UpsamplingLayer(), name="sharp_mask_up2")(x)
     x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 256, 2)
 
     #Too much, goes OOM
