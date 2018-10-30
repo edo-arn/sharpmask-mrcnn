@@ -1049,10 +1049,11 @@ def bilinear_upsampling2D(x, channels, stage, size=(2,2)):
     :param size:tuple for the upsampling, e.g. (2,2)
     :return: tensor of size [batch, rois, h x size[0], w x size[1], channels], linearly interpolated
     """
-    w = bilinear_kernel(size[0], size[1], channels)
+    h, w = size
+    w = bilinear_kernel(h, w, channels, use_bias=False)
     ups = KL.TimeDistributed(KL.UpSampling2D(size), name="sharp_mask_ups{}".format(stage))(x)
     cvt = KL.TimeDistributed(
-        KL.Conv2DTranspose(channels, kernel_size=size, activation="linear", padding="same", weights=w, trainable=False),
+        KL.Conv2D(channels, size, activation="linear", padding="same", use_bias=False, weights=w, trainable=False),
         name="sharp_deconv{}".format(stage))(ups)
     return cvt
 
