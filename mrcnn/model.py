@@ -1007,22 +1007,54 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
 
-#           |   n.batches x rois x a x a x channels input
-#           |
-#fpn
-
 def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
-    f = MaskROIAlign(pool_size, name="sharp_mask_roi_align{}".format(stage))([rois, fpn_map])
-    #f = KL.TimeDistributed(
-    #    KL.Conv2D(channels, (1, 1), strides=1, activation="relu", name="sharp_mask_crunch{}".format(stage)),
-    #    name="sharp_mask_td_ref{}a".format(stage))(f)
+    f = MaskROIAlign(pool_size, name="mrcnn_mask_ref_roi{}".format(stage))([rois, fpn_map])
+    f = KL.TimeDistributed(
+        KL.Conv2D(channels, (3, 3), padding="same", name="mrcnn_mask_ref_c{}f".format(stage)),
+        name="mrcnn_mask_ref_td{}a".format(stage))(f)
     m = KL.TimeDistributed(
-        KL.Conv2DTranspose(channels, (2, 2), strides=2, activation="relu", name="sharp_mask_deconv{}".format(stage)),
-        name="sharp_mask_td_ref{}b".format(stage))(x)
-    out = KL.Maximum(name="sharp_mask_merge{}".format(stage))([m, f])
+        KL.Conv2D(channels, (3, 3), padding="same", name="mrcnn_mask_ref_c{}m".format(stage)),
+        name="mrcnn_mask_ref_td{}b".format(stage))(x)
+    out = KL.Add(name="mrcnn_mask_ref_add{}".format(stage))([m, f])
+    out = KL.Activation('relu')(out)
     return out
 
 
+def bilinear_kernel(h,w,channels, use_bias = True, dtype = "float32"):
+    """
+    credits: https://github.com/pgrenholm/upsampling/blob/master/bilinearKernel.py
+    Returns uniform layer weights for a Conv2D or ConvTranspose2D layer in Keras 2.0, tensorflow channel ordering.
+    If the input image has size (in_height, in_width), the output image after scaling will have size
+    (h*(in_height-1) + 1,  w*(in_width-1) + 1)
+    Arguments:
+    (h,w) : the magnification factors for height and weight. These must be positive integers.
+    channels : the number of channels/filters, this must be the same in input and output image. Positive integer
+    use_bias : must have the same value as 'use_bias' in the layer initialization. Default is True,
+              which means that the layer has a bias which is set to 0.0. Boolean
+    dtype : the datatype of the returned weights
+    """
+    y = np.zeros((h,w,channels,channels), dtype = dtype)
+    for i in range(0,h) :
+        for j in range(0,w) :
+            y[i,j,:,:] = np.identity(channels) / float(h*w*1)
+    if use_bias : return [y,np.array([0.], dtype = dtype)]
+    else : return [y]
+
+
+def bilinear_upsampling2D(x, channels, stage, size=(2,2)):
+    """
+    Keras does not have an Upsampling layer with interpolation (until the most recent versions).
+    Use a combination of upsampling and conv2Dtranspose to achieve it.
+    :param x:   input tensor [batch, rois, h, w, channels]
+    :param size:tuple for the upsampling, e.g. (2,2)
+    :return: tensor of size [batch, rois, h x size[0], w x size[1], channels], linearly interpolated
+    """
+    w = bilinear_kernel(size[0], size[1], channels)
+    ups = KL.TimeDistributed(KL.UpSampling2D(size), name="mrcnn_mask_ups{}".format(stage))(x)
+    cvt = KL.TimeDistributed(
+        KL.Conv2DTranspose(channels, kernel_size=size, activation="linear", padding="same", weights=w, trainable=False),
+        name="mrcnn_deconv{}".format(stage))(ups)
+    return cvt
 
 
 
@@ -1044,42 +1076,32 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     # Shape: [batch, num_rois, MASK_POOL_SIZE, MASK_POOL_SIZE, channels]
     # 4 iterations over 14 x 14 x 256 rois
     x = MaskROIAlign(pool_sizes[0], name="sharp_mask_roi_align1")([rois, feature_maps[3]])
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv1a"), name="sharp_mask_td1a1")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn1a"), name='sharp_mask_td1a2')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu1a")(x)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="mrcnn_mask_conv1")(x)
+    x = KL.TimeDistributed(BatchNorm(),name='mrcnn_mask_bn1')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv1b"), name="sharp_mask_td1b1")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn1b"), name='sharp_mask_td1b2')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu1b")(x)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="mrcnn_mask_conv2")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='mrcnn_mask_bn2')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv1c"), name="sharp_mask_td1c1")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn1c"), name='sharp_mask_td1c2')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu1c")(x)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="mrcnn_mask_conv3")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='mrcnn_mask_bn3')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv1d"), name="sharp_mask_td1d1")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn1d"), name='sharp_mask_td1d2')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu1d")(x)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="mrcnn_mask_conv4")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='mrcnn_mask_bn4')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
 
-    #28 x 28 x 256
-    x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 256, 2)
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same", name="sharp_mask_conv2"), name="sharp_mask_td2a")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn2"), name='sharp_mask_td2b')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu3")(x)
+    x = bilinear_upsampling2D(x, 256, 1)
+    x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 256, 1)
 
-    # 56 x 56 x 256
-    x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 256, 3)
-    x = KL.TimeDistributed(KL.Conv2D(128, (3, 3), padding="same", name="sharp_mask_conv3"), name="sharp_mask_td3a")(x)
-    x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn3"), name='sharp_mask_td3b')(x, training=train_bn)
-    x = KL.Activation('relu', name="sharp_mask_relu4")(x)
+    x = bilinear_upsampling2D(x, 256, 2)
+    x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 256, 2)
 
-    # 112 x 112 x 128 gets out of memory, too many f.maps
-    #x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 128, 4)
-    #x = KL.TimeDistributed(KL.Conv2D(128, (3, 3), padding="same", name="sharp_mask_conv4"), name="sharp_mask_td4a")(x)
-    #x = KL.TimeDistributed(BatchNorm(name="sharp_mask_bn4"), name='sharp_mask_td4b')(x, training=train_bn)
-    #x = KL.Activation('relu', name="sharp_mask_relu4")(x)
+    x = bilinear_upsampling2D(x, 256, 3)
+    x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 256, 3)
 
-    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid", name="sharp_mask_conv5"),
-                           name="sharp_mask_out")(x)
+    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"), name="mrcnn_mask_out")(x)
     return x
 
 
@@ -2257,7 +2279,6 @@ class MaskRCNN():
             keras.regularizers.l2(self.config.WEIGHT_DECAY)(w) / tf.cast(tf.size(w), tf.float32)
             for w in self.keras_model.trainable_weights
             if 'gamma' not in w.name and 'beta' not in w.name]
-        print("Reg. losses:", reg_losses)
         self.keras_model.add_loss(tf.add_n(reg_losses))
 
         # Compile
@@ -2395,7 +2416,7 @@ class MaskRCNN():
             "3+": r"(res3.*)|(bn3.*)|(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
             "4+": r"(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
             "5+": r"(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
-            "mask": r"(^sharp\_mask.*)",
+            "mask": r"(^mrcnn\_mask.*)",
             # All layers
             "all": ".*",
         }
