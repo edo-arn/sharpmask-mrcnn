@@ -1098,8 +1098,9 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = bilinear_upsampling2D(x, 256, 2)
     x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 256, 2)
 
-    x = bilinear_upsampling2D(x, 256, 3)
-    x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 256, 3)
+    #Too much, goes OOM
+    #x = bilinear_upsampling2D(x, 256, 3)
+    #x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 256, 3)
 
     x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"), name="sharp_mask_out")(x)
     return x
