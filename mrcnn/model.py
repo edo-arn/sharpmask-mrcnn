@@ -1029,7 +1029,7 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
 
-def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
+def refinement_module_a(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
     f = KL.TimeDistributed(
         KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
@@ -1042,6 +1042,22 @@ def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
 
     out = KL.Add(name="sharp_mask_ref_add{}".format(stage))([m, f])
+    out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
+    return out
+
+def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
+    f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
+    f = KL.TimeDistributed(
+        KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
+        name="sharp_mask_ref_td{}a".format(stage))(f)
+    f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
+
+    m = KL.TimeDistributed(
+        KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
+        name="sharp_mask_ref_td{}b".format(stage))(x)
+    m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
+
+    out = KL.Concatenate(name="sharp_mask_ref_merge{}".format(stage))([m, f])
     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
     return out
 
