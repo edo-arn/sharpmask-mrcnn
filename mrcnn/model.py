@@ -1034,9 +1034,13 @@ def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
     f = KL.TimeDistributed(
         KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
         name="sharp_mask_ref_td{}a".format(stage))(f)
+    f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
+
     m = KL.TimeDistributed(
         KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
         name="sharp_mask_ref_td{}b".format(stage))(x)
+    m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
+
     out = KL.Add(name="sharp_mask_ref_add{}".format(stage))([m, f])
     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
     return out
