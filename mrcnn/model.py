@@ -886,10 +886,13 @@ class UpsamplingLayer(KE.Layer):
     """
     def __init__(self, size=(2,2), **kwargs):
         super(UpsamplingLayer, self).__init__(**kwargs)
-        self.size = [x for x in size]
+        self.size = size
 
     def call(self, inputs):
-        return tf.image.resize_bilinear(inputs, self.size)
+        shape = tf.shape(inputs)
+        h = shape[1]
+        w = shape[2]
+        return tf.image.resize_bilinear(inputs, [self.size[0]*h, self.size[1]*w])
 
     def compute_output_shape(self, input_shape):
         b, h, w, ch = input_shape
