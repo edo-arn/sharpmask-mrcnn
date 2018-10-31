@@ -1029,35 +1029,37 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
 #max
-def refinement_module_a(x, rois, fpn_map, pool_size, channels, stage):
+def refinement_module_a(x, rois, fpn_map, pool_size, channels, stage, train_bn):
     f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
     f = KL.TimeDistributed(KL.Conv2D(channels, (1, 1), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
                            name="sharp_mask_ref_td{}a".format(stage))(f)
-    f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
+    f = KL.TimeDistributed(BatchNorm(name="sharp_mask_ref_bn{}f"),
+                           name='sharp_mask_ref_bn{}f'.format(stage))(f, training=train_bn)
 
     out = KL.Add(name="sharp_mask_ref_add{}".format(stage))([x, f])
-    out = KL.TimeDistributed(KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
-                           name="sharp_mask_ref_td{}b".format(stage))(out)
-    out = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(out, training=True)
+    out = KL.TimeDistributed(KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}out".format(stage)),
+                             name="sharp_mask_ref_td{}b".format(stage))(out)
+    out = KL.TimeDistributed(BatchNorm(name="sharp_mask_ref_bn{}out".format(stage)),
+                             name='sharp_mask_ref_td{}c'.format(stage))(out, training=train_bn)
     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
     return out
 
-#Concat
-def refinement_module_b(x, rois, fpn_map, pool_size, channels, stage):
-    f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
-    f = KL.TimeDistributed(
-        KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
-        name="sharp_mask_ref_td{}a".format(stage))(f)
-    f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
-
-    m = KL.TimeDistributed(
-        KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
-        name="sharp_mask_ref_td{}b".format(stage))(x)
-    m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
-
-    out = KL.Concatenate(name="sharp_mask_ref_merge{}".format(stage))([m, f])
-    out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
-    return out
+# #Concat
+# def refinement_module_b(x, rois, fpn_map, pool_size, channels, stage):
+#     f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
+#     f = KL.TimeDistributed(
+#         KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
+#         name="sharp_mask_ref_td{}a".format(stage))(f)
+#     f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
+#
+#     m = KL.TimeDistributed(
+#         KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
+#         name="sharp_mask_ref_td{}b".format(stage))(x)
+#     m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
+#
+#     out = KL.Concatenate(name="sharp_mask_ref_merge{}".format(stage))([m, f])
+#     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
+#     return out
 
 def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=True):
     """Builds the computation graph of the mask head of Feature Pyramid Network.
@@ -1082,10 +1084,10 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.UpSampling2D(), name="sharp_mask_up1")(x)
-    x = refinement_module_a(x, rois, feature_maps[2], pool_sizes[1], 256, 2)
+    x = refinement_module_a(x, rois, feature_maps[2], pool_sizes[1], 256, 2, train_bn=train_bn)
 
     x = KL.TimeDistributed(KL.UpSampling2D(), name="sharp_mask_up2")(x)
-    x = refinement_module_a(x, rois, feature_maps[1], pool_sizes[2], 256, 3)
+    x = refinement_module_a(x, rois, feature_maps[1], pool_sizes[2], 256, 3, train_bn=train_bn)
 
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4a")(x)
     x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4a')(x, training=train_bn)
@@ -1099,8 +1101,8 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4c')(x, training=train_bn)
     x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4c")(x)
-    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4c')(x, training=train_bn)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4d")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4d')(x, training=train_bn)
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2DTranspose(256, (2, 2), strides=2, activation="relu"),name="sharp_mask_deconv")(x)
