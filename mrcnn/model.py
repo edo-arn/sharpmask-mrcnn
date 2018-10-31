@@ -1028,24 +1028,24 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
 
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
-
+#max
 def refinement_module_a(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
-    f = KL.TimeDistributed(
-        KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
-        name="sharp_mask_ref_td{}a".format(stage))(f)
+    f = KL.TimeDistributed(KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
+                           name="sharp_mask_ref_td{}a".format(stage))(f)
     f = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}f'.format(stage))(f, training=True)
+    f = KL.Activation('relu')(f)
 
-    m = KL.TimeDistributed(
-        KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
-        name="sharp_mask_ref_td{}b".format(stage))(x)
+    m = KL.TimeDistributed(KL.Conv2D(channels, (3, 3), padding="same", name="sharp_mask_ref_c{}m".format(stage)),
+                           name="sharp_mask_ref_td{}b".format(stage))(x)
     m = KL.TimeDistributed(BatchNorm(),name='sharp_mask_ref_bn{}m'.format(stage))(m, training=True)
 
-    out = KL.Add(name="sharp_mask_ref_add{}".format(stage))([m, f])
+    out = KL.Maximum(name="sharp_mask_ref_add{}".format(stage))([m, f])
     out = KL.Activation('relu', name="sharp_mask_ref_relu{}".format(stage))(out)
     return out
 
-def refinement_module(x, rois, fpn_map, pool_size, channels, stage):
+#Concat
+def refinement_module_b(x, rois, fpn_map, pool_size, channels, stage):
     f = MaskROIAlign(pool_size, name="sharp_mask_ref_roi{}".format(stage))([rois, fpn_map])
     f = KL.TimeDistributed(
         KL.Conv2D(int(channels//2), (3, 3), padding="same", name="sharp_mask_ref_c{}f".format(stage)),
@@ -1083,27 +1083,23 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.TimeDistributed(BatchNorm(),name='sharp_mask_bn1')(x, training=train_bn)
     x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv2")(x)
-    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn2')(x, training=train_bn)
-    x = KL.Activation('relu')(x)
-
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv3")(x)
-    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn3')(x, training=train_bn)
-    x = KL.Activation('relu')(x)
-
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4")(x)
-    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4')(x, training=train_bn)
-    x = KL.Activation('relu')(x)
-
     x = KL.TimeDistributed(UpsamplingLayer(), name="sharp_mask_up1")(x)
-    x = refinement_module(x, rois, feature_maps[2], pool_sizes[1], 256, 1)
+    x = refinement_module_a(x, rois, feature_maps[2], pool_sizes[1], 256, 2)
 
     x = KL.TimeDistributed(UpsamplingLayer(), name="sharp_mask_up2")(x)
-    x = refinement_module(x, rois, feature_maps[1], pool_sizes[2], 256, 2)
+    x = refinement_module_a(x, rois, feature_maps[1], pool_sizes[2], 256, 3)
 
-    #Too much, goes OOM
-    #x = bilinear_upsampling2D(x, 256, 3)
-    #x = refinement_module(x, rois, feature_maps[0], pool_sizes[3], 256, 3)
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4a")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4a')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4b")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4b')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"), name="sharp_mask_conv4c")(x)
+    x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn4c')(x, training=train_bn)
+    x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"), name="sharp_mask_out")(x)
     return x
