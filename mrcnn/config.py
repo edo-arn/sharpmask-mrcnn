@@ -151,7 +151,7 @@ class Config(object):
 
     # Pooled ROIs
     POOL_SIZE = 7
-    MASK_POOL_SIZES = [14, 28, 56, 112, 224]
+    MASK_POOL_SIZES = [7, 14, 28, 56, 112]
 
     # Shape of output mask
     # To change this you also need to change the neural network mask branch
