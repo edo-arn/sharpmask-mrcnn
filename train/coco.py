@@ -498,12 +498,12 @@ if __name__ == '__main__':
         # *** This training schedule is an example. Update to your needs ***
 
         # Training - Stage 1
-        print("Training mask layers only")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE,
-                    epochs=40,
-                    layers='mask',
-                    augmentation=augmentation)
+        #print("Training mask layers only")
+        #model.train(dataset_train, dataset_val,
+                    #learning_rate=config.LEARNING_RATE,
+                    #epochs=40,
+                    #layers='mask',
+                    #augmentation=augmentation)
 
         # Training - Stage 2
         # Finetune layers from ResNet stage 4 and up
@@ -516,12 +516,12 @@ if __name__ == '__main__':
 
         # Training - Stage 3
         # Fine tune all layers
-        #print("Fine tune all layers")
-        #model.train(dataset_train, dataset_val,
-                    #learning_rate=config.LEARNING_RATE / 10,
-                    #epochs=160,
-                    #layers='mask',
-                    #augmentation=augmentation)
+        print("Fine tune mask layers")
+        model.train(dataset_train, dataset_val,
+                    learning_rate=config.LEARNING_RATE / 10,
+                    epochs=60,
+                    layers='mask',
+                    augmentation=augmentation)
 
     elif args.command == "evaluate":
         # Validation dataset
