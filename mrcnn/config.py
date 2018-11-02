@@ -101,7 +101,7 @@ class Config(object):
     # If enabled, resizes instance masks to a smaller size to reduce
     # memory load. Recommended when using high-resolution images.
     USE_MINI_MASK = True
-    MINI_MASK_SHAPE = (56, 56)  # (height, width) of the mini-mask
+    MINI_MASK_SHAPE = (128, 128)  # (height, width) of the mini-mask
 
     # Input image resizing
     # Generally, use the "square" resizing mode for training and predicting
@@ -151,11 +151,11 @@ class Config(object):
 
     # Pooled ROIs
     POOL_SIZE = 7
-    MASK_POOL_SIZES = [7, 14, 28, 56, 112]
+    MASK_POOL_SIZES = [8, 16, 32, 64, 128]
 
     # Shape of output mask
     # To change this you also need to change the neural network mask branch
-    MASK_SHAPE = [56, 56]
+    MASK_SHAPE = [128, 128]
 
     # Maximum number of ground truth instances to use in one image
     MAX_GT_INSTANCES = 100
