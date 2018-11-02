@@ -85,8 +85,8 @@ class CocoConfig(Config):
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
-    MASK_SHAPE = [56, 56]
-    MINI_MASK_SHAPE = (56, 56)
+    MASK_SHAPE = [128, 128]
+    MINI_MASK_SHAPE = (128, 128)
 
 
 ############################################################
@@ -498,12 +498,12 @@ if __name__ == '__main__':
         # *** This training schedule is an example. Update to your needs ***
 
         # Training - Stage 1
-        #print("Training mask layers only")
-        #model.train(dataset_train, dataset_val,
-                    #learning_rate=config.LEARNING_RATE,
-                    #epochs=40,
-                    #layers='mask',
-                    #augmentation=augmentation)
+        print("Training mask layers only")
+        model.train(dataset_train, dataset_val,
+                    learning_rate=config.LEARNING_RATE,
+                    epochs=40,
+                    layers='mask',
+                    augmentation=augmentation)
 
         # Training - Stage 2
         # Finetune layers from ResNet stage 4 and up
@@ -519,7 +519,7 @@ if __name__ == '__main__':
         print("Fine tune mask layers")
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE / 10,
-                    epochs=60,
+                    epochs=40,
                     layers='mask',
                     augmentation=augmentation)
 
