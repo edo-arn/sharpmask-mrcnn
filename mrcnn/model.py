@@ -1107,7 +1107,7 @@ def build_fpn_mask_graph(rois, feature_maps, pool_sizes, num_classes, train_bn=T
     x = KL.TimeDistributed(BatchNorm(), name='sharp_mask_bn5d')(x, training=train_bn)
     x = KL.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"), name="sharp_mask_out")(x)
+    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="relu"), name="sharp_mask_out")(x)
     x = KL.TimeDistributed(KL.Conv2DTranspose(num_classes, (2, 2), strides=2, activation="sigmoid"),name="sharp_mask_deconv")(x)
 
     return x
