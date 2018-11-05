@@ -509,9 +509,9 @@ if __name__ == '__main__':
         #Finetune layers from ResNet stage 4 and up
         print("Fine tune Resnet stage 5 and up")
         model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE,
+                    learning_rate=config.LEARNING_RATE / 5,
                     epochs=120,
-                    layers='4+',
+                    layers='5+',
                     augmentation=augmentation)
 
         # Training - Stage 3
