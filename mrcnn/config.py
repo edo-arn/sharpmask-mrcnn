@@ -144,10 +144,10 @@ class Config(object):
     # enough positive proposals to fill this and keep a positive:negative
     # ratio of 1:3. You can increase the number of proposals by adjusting
     # the RPN NMS threshold.
-    TRAIN_ROIS_PER_IMAGE = 120
+    TRAIN_ROIS_PER_IMAGE = 128
 
     # Percent of positive ROIs used to train classifier/mask heads
-    ROI_POSITIVE_RATIO = 0.33
+    ROI_POSITIVE_RATIO = 0.40
 
     # Pooled ROIs
     POOL_SIZE = 7
